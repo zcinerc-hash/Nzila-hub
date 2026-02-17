@@ -4048,23 +4048,24 @@ let userListenerUnsub = null;
 let referralsListenerUnsub = null; // listener for real-time referrals
 
 // Investment plans (kept and consolidated)
-const investmentPlans = [
-
-    { amount: 8000, daily: 350, period: "Diário", total: null },
-    { amount: 10000, daily: 400, period: "Diário", total: null },
-    { amount: 12500, daily: 750, period: "Diário", total: null },
-    { amount: 15000, daily: 900, period: "Diário", total: null },
-    { amount: 22000, daily: 1250, period: "Diário", total: null },
-    { amount: 30000, daily: 1650, period: "Diário", total: null },
-    { amount: 50000, daily: 2100, period: "Diário", total: null },
-    { amount: 65000, daily: 2550, period: "Diário", total: null },
-    { amount: 75000, daily: 3000, period: "Diário", total: null },
-    { amount: 99000, daily: 5000, period: "Diário", total: null },
-    { amount: 150000, daily: 7500, period: "Diário", total: null },
-    { amount: 350000, daily: 15000, period: "Diário", total: null },
-    { amount: 500000, daily: 50000, period: "Diário", total: null },
-    { amount: 1000000, daily: 100000, period: "Diário", total: null }
-];
+const investmentPlans= [
+        { amount: 3500, daily: 200, period: "Diário", total: null },
+        { amount: 5000, daily: 500, period: "Diário", total: null },
+        { amount: 10000, daily: 1000, period: "Diário", total: null },
+        { amount: 20000, daily: 2000, period: "Diário", total: null },
+        { amount: 35000, daily: 3500, period: "Diário", total: null },
+        { amount: 40000, daily: 4000, period: "Diário", total: null },
+        { amount: 50000, daily: 5000, period: "Diário", total: null },
+        { amount: 60000, daily: 6000, period: "Diário", total: null },
+        { amount: 70000, daily: 7000, period: "Diário", total: null },
+        { amount: 80000, daily: 8000, period: "Diário", total: null },
+        { amount: 90000, daily: 9000, period: "Diário", total: null },
+        { amount: 100000, daily: 10000, period: "Diário", total: null },
+        { amount: 150000, daily: 15000, period: "Diário", total: null },
+        { amount: 160000, daily: 16000, period: "Diário", total: null },
+        { amount: 500000, daily: 50000, period: "Diário", total: null },
+        { amount: 1000000, daily: 100000, period: "Diário", total: null }
+    ];
 
 // --- Helpers (formatters) ---
 function formatCurrency(value) {
@@ -5010,19 +5011,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadInvestmentPlans();
     showScreen('home');
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
   </script>
 </body>
 </html>
