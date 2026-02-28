@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -4055,7 +4054,7 @@ async function apiRequest(endpoint, method = "GET", data = null, attempt = 1) {
 }
 
 // ==========================================
-// 📦 VARIÁVEIS GLOBAIS (MANTÉM ORIGINAL)
+// 📦 VARIÁVEIS GLOBAIS
 // ==========================================
 
 let currentUser = null;
@@ -4068,7 +4067,7 @@ let hasActiveInvestment = false;
 let growthChart = null;
 let realTimeUpdateInterval = null;
 
-// Investment plans (IDÊNTICO AO ORIGINAL)
+// Investment plans
 const investmentPlans = [
   { amount: 3500, daily: 200, period: "Diário", total: null },
   { amount: 5000, daily: 500, period: "Diário", total: null },
@@ -4089,7 +4088,7 @@ const investmentPlans = [
 ];
 
 // ==========================================
-// 🎨 FORMATADORES (IDÊNTICO)
+// 🎨 FORMATADORES
 // ==========================================
 
 function formatCurrency(value) {
@@ -4136,7 +4135,7 @@ function formatDateOnly(dateString) {
 }
 
 // ==========================================
-// 🎯 UI HELPERS (IDÊNTICO)
+// 🎯 UI HELPERS
 // ==========================================
 
 function showToast(title, message, type = 'success') {
@@ -4201,7 +4200,7 @@ function joinTelegramGroup() {
 }
 
 // ==========================================
-// 🔐 AUTENTICAÇÃO E VERIFICAÇÃO
+// 🔐 AUTENTICAÇÃO
 // ==========================================
 
 async function checkUserLoggedIn() {
@@ -4282,11 +4281,18 @@ async function loadUserData() {
         const response = await apiRequest(`/usuario/${currentUser.uid}`, "GET");
         
         if (response && response.data) {
+            // ✅ IMPORTANTE: Atualizar userData do backend
             userData = response.data;
+            
+            // ✅ IMPORTANTE: Sincronizar com localStorage
+            localStorage.setItem('userBalance', userData.balance || 0);
+            localStorage.setItem('userData', JSON.stringify(userData));
+            
             hasActiveInvestment = Array.isArray(userData.investments) && userData.investments.some(inv => inv.status === 'active');
             updateBankAccountsInfo();
             await loadFriendsStats();
             await loadReferralsList();
+            displayCommissionStatus();
         }
     } catch (err) {
         console.error('Error loading user data:', err);
@@ -4297,7 +4303,7 @@ async function loadUserData() {
 async function loadFriendsStats() {
     if (!userData || !userData.agentCode) return;
     try {
-        const response = await apiRequest('/usuarios', 'GET');
+        const response = await apiRequest('/usuarios-consultar', 'GET');
         
         if (response && response.data) {
             let registeredCount = 0;
@@ -4336,7 +4342,7 @@ async function loadReferralsList() {
     if (!container || !userData || !userData.agentCode) return;
     
     try {
-        const response = await apiRequest('/usuarios', 'GET');
+        const response = await apiRequest('/usuarios-consultar', 'GET');
         
         if (!response || !response.data) {
             container.innerHTML = `<div class="empty-history"><i class="fas fa-user-friends"></i><h3>Nenhum referido ainda</h3><p>Compartilhe seu link de convite para ganhar comissões</p></div>`;
@@ -4380,8 +4386,110 @@ async function loadReferralsList() {
     }
 }
 
+// ✅ Exibir comissões
+function displayCommissionStatus() {
+    if (!userData) return;
+
+    const commissions = userData.commissions || [];
+    
+    const pending = commissions
+        .filter(c => c.status === 'pending')
+        .reduce((sum, c) => sum + c.amount, 0);
+
+    const available = commissions
+        .filter(c => c.status === 'available')
+        .reduce((sum, c) => sum + c.amount, 0);
+
+    const pendingEl = document.getElementById('pendingCommission');
+    if (pendingEl) {
+        pendingEl.textContent = formatCurrency(pending);
+        pendingEl.style.color = pending > 0 ? '#ff9800' : '#999';
+    }
+
+    const availableEl = document.getElementById('availableCommission');
+    if (availableEl) {
+        availableEl.textContent = formatCurrency(available);
+        availableEl.style.color = available > 0 ? '#4caf50' : '#999';
+    }
+
+    displayCommissionsList(commissions);
+
+    const withdrawBtn = document.getElementById('withdrawCommissionBtn');
+    if (withdrawBtn) withdrawBtn.disabled = available <= 0;
+}
+
+function displayCommissionsList(commissions) {
+    const container = document.getElementById('commissionsList');
+    if (!container) return;
+
+    if (commissions.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #999;">Nenhuma comissão ainda</p>';
+        return;
+    }
+
+    container.innerHTML = commissions.map(comm => `
+        <div style="
+            background: ${comm.status === 'available' ? 'rgba(76,175,80,0.1)' : 'rgba(255,152,0,0.1)'};
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 4px solid ${comm.status === 'available' ? '#4caf50' : '#ff9800'};
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>${comm.fromUserName || 'Referido'}</strong>
+                    <div style="font-size: 0.85rem; color: #666;">
+                        ${comm.type === 'signup_bonus' ? '🎁 Bónus de Registro' : `💰 Investimento: ${formatCurrency(comm.investmentAmount)}`}
+                    </div>
+                </div>
+                <div style="color: ${comm.status === 'available' ? '#4caf50' : '#ff9800'}; font-weight: bold; font-size: 1.1rem;">
+                    +${formatCurrency(comm.amount)}
+                </div>
+            </div>
+            <div style="font-size: 0.8rem; color: #999; margin-top: 5px;">
+                ${formatDate(comm.date)} - ${comm.status === 'available' ? '✅ Disponível' : '⏳ Pendente'}
+            </div>
+        </div>
+    `).join('');
+}
+
+// ✅ Sacar comissão
+async function withdrawCommission() {
+    if (!userData) {
+        showToast('Erro', 'Dados do usuário não carregados', 'error');
+        return;
+    }
+
+    const available = (userData.commissions || [])
+        .filter(c => c.status === 'available')
+        .reduce((sum, c) => sum + c.amount, 0);
+
+    if (available <= 0) {
+        showToast('Aviso', 'Nenhuma comissão disponível para sacar', 'warning');
+        return;
+    }
+
+    try {
+        const response = await apiRequest('/sacar-comissao', 'POST', {
+            uid: currentUser.uid,
+            amount: available
+        });
+
+        if (response && response.success) {
+            showToast('Sucesso!', `Levantamento de ${formatCurrency(available)} Kz solicitado!`, 'success');
+            await loadUserData();
+            updateUI();
+        } else {
+            showToast('Erro', response?.message || 'Falha ao sacar comissão', 'error');
+        }
+    } catch (err) {
+        console.error('Erro ao sacar comissão:', err);
+        showToast('Erro', err.message, 'error');
+    }
+}
+
 // ==========================================
-// 💰 FUNÇÕES DE BANCO DE DADOS
+// 💰 BANCO DE DADOS
 // ==========================================
 
 function updateBankAccountsInfo() {
@@ -4446,6 +4554,9 @@ async function addBankAccount(event) {
         if (!userData.bankAccounts) userData.bankAccounts = [];
         userData.bankAccounts.push(newAccount);
         
+        // ✅ SINCRONIZAR COM BACKEND
+        localStorage.setItem('userData', JSON.stringify(userData));
+        
         showToast('Sucesso!', 'Conta bancária adicionada com sucesso!', 'success');
         
         const a = document.getElementById('accountName');
@@ -4509,12 +4620,13 @@ function loadBankAccountsForWithdrawal() {
 }
 
 // ==========================================
-// 🎬 INTERFACE UPDATES (✅ COM NÚMERO MASCARADO)
+// 🎬 INTERFACE UPDATES
 // ==========================================
 
 async function updateUI() {
     if (!userData) return;
     
+    // ✅ USAR SEMPRE OS DADOS DO BACKEND/userData
     const balance = userData.balance || 0;
     const invested = calculateTotalInvested();
     const dailyEarnings = calculateDailyEarnings();
@@ -4528,7 +4640,6 @@ async function updateUI() {
     const elDaily = document.getElementById('dailyEarningsAmount');
     if (elDaily) elDaily.textContent = formatCurrency(dailyEarnings);
 
-    // ✅ EXIBIR APENAS NÚMERO MASCARADO NA GREETING
     const agentNumberEl = document.getElementById('agentNumber');
     if (agentNumberEl && userData.phone) {
         const maskedPhone = userData.phone.substring(0, 3) + '***' + userData.phone.substring(6);
@@ -4565,22 +4676,47 @@ async function updateUI() {
 
     await loadFriendsStats();
     await loadReferralsList();
+    displayCommissionStatus();
 }
 
 function calculateTotalInvested() {
-    if (!userData || !Array.isArray(userData.investments)) return 0;
-    return userData.investments.reduce((sum, inv) => sum + (inv.planAmount || 0), 0);
+    if (!userData || !userData.investments) return 0;
+    
+    let total = 0;
+    if (typeof userData.investments === 'object' && !Array.isArray(userData.investments)) {
+        Object.values(userData.investments).forEach(inv => {
+            total += inv.planAmount || 0;
+        });
+    } else if (Array.isArray(userData.investments)) {
+        userData.investments.forEach(inv => {
+            total += inv.planAmount || 0;
+        });
+    }
+    return total;
 }
 
 function calculateDailyEarnings() {
-    if (!userData || !Array.isArray(userData.investments)) return 0;
-    const activeInvestment = userData.investments.find(inv => inv.status === 'active');
-    if (!activeInvestment) return 0;
-    return activeInvestment.dailyReturn || 0;
+    if (!userData || !userData.investments) return 0;
+    
+    let daily = 0;
+    if (typeof userData.investments === 'object' && !Array.isArray(userData.investments)) {
+        Object.values(userData.investments).forEach(inv => {
+            if (inv.status === 'active') {
+                daily += inv.dailyReturn || 0;
+            }
+        });
+    } else if (Array.isArray(userData.investments)) {
+        userData.investments.forEach(inv => {
+            if (inv.status === 'active') {
+                daily += inv.dailyReturn || 0;
+            }
+        });
+    }
+    return daily;
 }
 
 // ==========================================
-// 🏠 SCREEN NAVIGATION (IDÊNTICO)
+// 🏠 SCREEN NAVIGATION
 // ==========================================
 
 function showScreen(screenName) {
@@ -4603,7 +4739,7 @@ function showScreen(screenName) {
 }
 
 // ==========================================
-// 🔧 MODAL FUNCTIONS (MANTÉM ORIGINAL)
+// 🔧 MODAL FUNCTIONS
 // ==========================================
 
 function openModal(modalId) {
@@ -4945,6 +5081,9 @@ async function submitDeposit() {
         if (!userData.deposits) userData.deposits = [];
         userData.deposits.push(deposit);
         
+        // ✅ SINCRONIZAR COM localStorage
+        localStorage.setItem('userData', JSON.stringify(userData));
+        
         showToast('Sucesso!', 'Depósito solicitado. Envie o comprovativo para o suporte no Telegram para validação.', 'success');
         closeModal('depositModal');
         loadRecentTransactions();
@@ -5010,13 +5149,20 @@ async function submitWithdrawal(event) {
             userUid: currentUser.uid
         };
         
-        const newBalance = userData.balance - amount;
-        userData.balance = newBalance;
+        // ✅ REDUZIR SALDO APENAS APÓS APROVAÇÃO NO BACKEND
+        // NÃO REDUZIR AQUI LOCALMENTE
+        
         if (!userData.withdrawals) userData.withdrawals = [];
         userData.withdrawals.push(withdrawal);
         
+        // ✅ SINCRONIZAR COM localStorage
+        localStorage.setItem('userData', JSON.stringify(userData));
+        
         showToast('Sucesso!', `Levantamento de ${formatCurrency(amount)} solicitado. Líquido: ${formatCurrency(netAmount)} para ${bankAccountData.bankName}.`, 'success');
         closeModal('withdrawalModal');
+        
+        // ✅ RECARREGAR DADOS DO BACKEND
+        await loadUserData();
         updateUI();
         loadRecentTransactions();
     } catch (err) {
@@ -5098,63 +5244,29 @@ async function confirmInvestment() {
     }
     
     try {
-        const newBalance = userData.balance - selectedPlan.amount;
-        const investment = {
+        // ✅ CHAMAR BACKEND PARA CRIAR INVESTIMENTO
+        const response = await apiRequest('/criar-investimento', 'POST', {
+            uid: currentUser.uid,
             planAmount: selectedPlan.amount,
             dailyReturn: selectedPlan.daily,
-            period: selectedPlan.period,
-            startDate: new Date().toISOString(),
-            lastDailyCredit: new Date().toISOString(),
-            status: 'active',
-            totalEarned: 0,
-            id: 'inv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-        };
-        
-        userData.balance = newBalance;
-        if (!userData.investments) userData.investments = [];
-        userData.investments.push(investment);
-        hasActiveInvestment = true;
-        userData.hasInvestedBefore = true;
-        
-        if (userData.referredBy) {
-            try {
-                const response = await apiRequest('/usuarios', 'GET');
-                
-                if (response && response.data) {
-                    const referrer = response.data.find(u => u.agentCode === userData.referredBy);
-                    
-                    if (referrer) {
-                        const commissionAmount = 50;
-                        
-                        if (!referrer.earnings) referrer.earnings = {};
-                        referrer.earnings.commission = (referrer.earnings.commission || 0) + commissionAmount;
-                        referrer.balance = (referrer.balance || 0) + commissionAmount;
-                        
-                        if (!referrer.commissions) referrer.commissions = [];
-                        referrer.commissions.push({
-                            amount: commissionAmount,
-                            date: new Date().toISOString(),
-                            fromUserId: currentUser.uid,
-                            fromUserName: userData.nome || 'Referido',
-                            investmentAmount: selectedPlan.amount,
-                            type: 'referral_commission'
-                        });
-                        
-                        console.log(`✅ Comissão de 50Kz adicionada para ${userData.referredBy}`);
-                    }
-                }
-            } catch (err) {
-                console.error('Erro ao processar comissão:', err);
+            period: selectedPlan.period
+        });
+
+        if (response && response.success) {
+            showToast('Sucesso!', `Você investiu ${formatNumber(selectedPlan.amount)} Kz no plano com retorno diário de ${formatNumber(selectedPlan.daily)} Kz.`, 'success');
+            
+            // ✅ RECARREGAR DADOS DO BACKEND
+            await loadUserData();
+            updateUI();
+            closeModal('investmentModal');
+            loadRecentTransactions();
+            if (document.getElementById('myPlansScreen')?.classList.contains('active')) {
+                loadActivePlans();
             }
+        } else {
+            showToast('Erro', response?.message || 'Falha ao criar investimento', 'error');
         }
-        
-        showToast('Sucesso!', `Você investiu ${formatNumber(selectedPlan.amount)} Kz no plano com retorno diário de ${formatNumber(selectedPlan.daily)} Kz.`, 'success');
-        updateUI();
-        closeModal('investmentModal');
-        loadRecentTransactions();
-        if (document.getElementById('myPlansScreen')?.classList.contains('active')) {
-            loadActivePlans();
-        }
+
     } catch (err) {
         console.error(err);
         showToast('Erro', 'Falha ao processar investimento: ' + (err?.message || err), 'error');
@@ -5165,7 +5277,16 @@ function loadActivePlans() {
     const container = document.getElementById('activePlansContainer');
     if (!container || !userData) return;
     
-    const activeInvestments = Array.isArray(userData.investments) ? userData.investments.filter(inv => inv.status === 'active') : [];
+    const activeInvestments = [];
+    if (typeof userData.investments === 'object' && !Array.isArray(userData.investments)) {
+        Object.values(userData.investments).forEach(inv => {
+            if (inv.status === 'active') {
+                activeInvestments.push(inv);
+            }
+        });
+    } else if (Array.isArray(userData.investments)) {
+        activeInvestments.push(...userData.investments.filter(inv => inv.status === 'active'));
+    }
     
     if (activeInvestments.length === 0) {
         container.innerHTML = `<div class="empty-history"><i class="fas fa-chart-line"></i><h3>Nenhum plano ativo</h3><p>Comece a investir para ver seus planos aqui</p><button class="btn btn-success" onclick="openModal('investmentModal')" style="margin-top: 15px;"><i class="fas fa-plus"></i> Investir Agora</button></div>`;
@@ -5387,9 +5508,17 @@ function addNewGoal(event) {
 }
 
 function updatePlannerInfo() {
-    if (!userData || !Array.isArray(userData.investments)) return;
+    if (!userData || !userData.investments) return;
     
-    const activeInvestment = userData.investments.find(inv => inv.status === 'active');
+    let activeInvestment = null;
+    if (typeof userData.investments === 'object' && !Array.isArray(userData.investments)) {
+        Object.values(userData.investments).forEach(inv => {
+            if (inv.status === 'active') activeInvestment = inv;
+        });
+    } else if (Array.isArray(userData.investments)) {
+        activeInvestment = userData.investments.find(inv => inv.status === 'active');
+    }
+    
     if (!activeInvestment) return;
     
     const startDate = new Date(activeInvestment.startDate || Date.now());
@@ -5514,7 +5643,7 @@ const exported = [
     'changeHistoryTab', 'confirmInvestment', 'submitCancelRequest', 'addBankAccount', 'copyInviteLink', 'copyAgentCode',
     'openSupport', 'logout', 'loadAnalyticsData', 'runSimulation', 'addNewGoal', 'terminateOtherSessions',
     'loadInvestmentPlans', 'selectPlan', 'loadActivePlans', 'loadRecentTransactions', 'loadBankAccountsForWithdrawal',
-    'updateGoalsProgress', 'updatePlannerInfo', 'checkIfUserBanned', 'resetModals'
+    'updateGoalsProgress', 'updatePlannerInfo', 'checkIfUserBanned', 'resetModals', 'withdrawCommission', 'displayCommissionStatus'
 ];
 
 exported.forEach(name => {
@@ -5568,6 +5697,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 </script>
-
 </body>
 </html>
